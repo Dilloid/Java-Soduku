@@ -1,6 +1,5 @@
 package com.napier.set08122;
 
-import java.io.*;
 import java.util.*;
 
 public class App
@@ -94,19 +93,21 @@ public class App
 
                 if (col != -1 && row >= 0 && row <= 8 && !isHint(row, col))
                 {
-                    if (input[2] != null)
+                    if (input[2] != null && input[2].matches("^[0-9]+$"))
                     {
-                        if (moves.size() > moveNo)
-                        {
-                            for (int i = moves.size()-1; i >= moveNo; i--)
-                                moves.remove(i);
-                        }
-
-                        int lastValue = grid[row][col];
                         int newValue = Integer.parseInt(input[2]);
-                        grid[row][col] = newValue;
-                        moves.add(new int[]{row, col, newValue, lastValue});
-                        moveNo++;
+
+                        if (newValue >= 1 && newValue <= 9) {
+                            if (moves.size() > moveNo) {
+                                for (int i = moves.size() - 1; i >= moveNo; i--)
+                                    moves.remove(i);
+                            }
+
+                            int lastValue = grid[row][col];
+                            grid[row][col] = newValue;
+                            moves.add(new int[]{row, col, newValue, lastValue});
+                            moveNo++;
+                        }
                     }
                 }
             }
