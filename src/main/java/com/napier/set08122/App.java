@@ -1,6 +1,13 @@
 package com.napier.set08122;
 
+import java.io.*;
+import java.net.URISyntaxException;
 import java.util.*;
+import com.sun.jna.Function;
+import com.sun.jna.platform.win32.WinDef.BOOL;
+import com.sun.jna.platform.win32.WinDef.DWORD;
+import com.sun.jna.platform.win32.WinDef.DWORDByReference;
+import com.sun.jna.platform.win32.WinNT.HANDLE;
 
 public class App
 {
@@ -23,8 +30,9 @@ public class App
       └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘
     */
 
-    public static String[] instructions = new String[]{
-            "   Welcome to Dilloid's Sudoku!",
+    private static String jarPath, savePath;
+    private static final String[] INSTRUCTIONS = new String[]{
+            "   \u001B[1;35mWelcome to Dilloid's Sudoku!\u001B[0m",
             "   ",
             "   Each space in the grid is represented by a",
             "   code consisting of one letter and one number.",
@@ -41,48 +49,36 @@ public class App
                     " - Delete the number in square \u001B[36mF9\u001B[0m.",
     };
 
-    public static int counter = 0, moveNo = 0;
-    public static int[][] grid, gridCopy, original;
-    public static List<int[]> hints, moves;
+    private static boolean completed = false;
+    private static int counter = 0, moveNo = 0;
+    private static int[][] grid, gridCopy, original;
+    private static List<int[]> hints, moves;
 
     public static void main(String[] args)
     {
-        grid = new int[9][9];
+        enableWindows10AnsiSupport();
+        createSaveDir();
 
-        for (int row = 0; row < 9; row++)
-        {
-            for (int col = 0; col < 9; col++)
-            {
-                grid[row][col] = 0;
-            }
-        }
-
-        generateSolution(grid);
-        original = grid;
-
-        removeNumbers();
-        hints = getFilledSquares(grid);
-        moves = new ArrayList<int[]>();
-
+        newGame(12);
         printGrid();
 
         Scanner scanner = new Scanner(System.in);
 
         while (true)
         {
-            System.out.print("\nMore Commands:" +
-                             "\n\u001B[32mundo\u001B[0m - Undo the last move." +
-                             "\n\u001B[32mredo\u001B[0m - Redo the move you last undid." +
-                             "\n\u001B[32mexit\u001B[0m - Exit the game.\n");
+            System.out.print("\n More Commands:" +
+                             "\n \u001B[32mundo\u001B[0m - Undo the last move." +
+                             "\n \u001B[32mredo\u001B[0m - Redo the move you last undid." +
+                             "\n \u001B[32mexit\u001B[0m - Exit the game.\n");
 
-            System.out.print("\nPlease input a command:\n\u001B[32m> ");
+            System.out.print("\n Please input a command:\n\u001B[32m> ");
             String[] input = scanner.nextLine().split(" ");
 
             if (input[0].equalsIgnoreCase("check"))
             {
                 if (testPuzzle(grid))
                 {
-                    System.out.print("\nCongratulations, you win!\n");
+                    System.out.print("\n Congratulations, you win!\n");
                     break;
                 }
             }
@@ -152,8 +148,69 @@ public class App
                     moveNo++;
                 }
             }
+            else if (input[0].equalsIgnoreCase("save"))
+            {
+                createSaveDir();
+
+                if (input[1] != null)
+                {
+                    try
+                    {
+                        GameData save = new GameData(grid, gridCopy, original, counter,
+                                                     moveNo, completed, hints, moves);
+
+                        String filePath = savePath + input[1] + ".ser";
+
+                        File saveFile = new File(filePath);
+                        saveFile.createNewFile();
+
+                        FileOutputStream fileOut = new FileOutputStream(saveFile, false);
+                        ObjectOutputStream out = new ObjectOutputStream(fileOut);
+                        out.writeObject(save);
+                        out.close();
+                        fileOut.close();
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            else if (input[0].equalsIgnoreCase("load"))
+            {
+                createSaveDir();
+
+                if (input[1] != null)
+                {
+                    try
+                    {
+                        GameData load = null;
+
+                        String filePath = savePath + input[1] + ".ser";
+                        FileInputStream fileIn = new FileInputStream(filePath);
+                        ObjectInputStream in = new ObjectInputStream(fileIn);
+                        load = (GameData) in.readObject();
+                        in.close();
+                        fileIn.close();
+
+                        grid = load.getGrid();
+                        gridCopy = load.getGridCopy();
+                        original = load.getOriginal();
+                        counter = load.getCounter();
+                        moveNo = load.getMoveNo();
+                        completed = load.getCompleted();
+                        hints = load.getHints();
+                        moves = load.getMoves();
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }
             else if (input[0].equalsIgnoreCase("exit"))
             {
+                System.out.println("\n \u001B[35mThank you for playing!\u001B[0m");
                 System.exit(0);
             }
 
@@ -165,14 +222,14 @@ public class App
         System.out.print("\033[H\033[2J");
         System.out.flush();
 
-        System.out.print("\n\u001B[36m    A   B   C     D   E   F     G   H   I\u001B[0m");
-        System.out.print("\n  ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐");
+        System.out.print("\n \u001B[36m    A   B   C     D   E   F     G   H   I\u001B[0m");
+        System.out.print("\n   ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐");
 
 
         int ins = 0;
         for (int row = 0; row < 9; row++)
         {
-            System.out.print("\n\u001B[36m" + (row + 1) + "\u001B[0m");
+            System.out.print("\n \u001B[36m" + (row + 1) + "\u001B[0m");
 
             for (int col = 0; col < 9; col++)
             {
@@ -189,17 +246,17 @@ public class App
                 }
             }
 
-            System.out.print(" |" + instructions[ins++]);
+            System.out.print(" |" + INSTRUCTIONS[ins++]);
 
             if (row == 2 || row == 5)
             {
                 System.out.print("\n");
-                System.out.println("  └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘" + instructions[ins++]);
-                System.out.print("  ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐" + instructions[ins++]);
+                System.out.println("   └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘" + INSTRUCTIONS[ins++]);
+                System.out.print("   ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐" + INSTRUCTIONS[ins++]);
             }
         }
 
-        System.out.print("\n  └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘\n");
+        System.out.print("\n   └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘\n");
     }
 
     private static boolean testPuzzle(int[][] grid)
@@ -219,6 +276,22 @@ public class App
         }
 
         return true;
+    }
+
+    private static void newGame(int difficulty)
+    {
+        grid = new int[9][9];
+
+        for (int row = 0; row < 9; row++)
+            for (int col = 0; col < 9; col++)
+                grid[row][col] = 0;
+
+        generateSolution(grid);
+        original = grid;
+
+        removeNumbers(difficulty);
+        hints = getFilledSquares(grid);
+        moves = new ArrayList<int[]>();
     }
 
     private static boolean generateSolution(int[][] grid)
@@ -293,11 +366,11 @@ public class App
         return false;
     }
 
-    private static void removeNumbers()
+    private static void removeNumbers(int totalRounds)
     {
         List<int[]> filledSquares = getFilledSquares(grid);
         int filledCount = filledSquares.size();
-        int rounds = 12;
+        int rounds = totalRounds;
 
         while (rounds > 0 && filledCount >= 17)
         {
@@ -450,5 +523,45 @@ public class App
         }
 
         return -1;
+    }
+
+    public static void createSaveDir()
+    {
+        try
+        {
+            jarPath = App.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+            savePath = jarPath.replaceAll(jarPath.substring(jarPath.lastIndexOf("/") + 1), "") + "saves/";
+
+            File saveDir = new File(savePath);
+            if (!saveDir.exists())
+                saveDir.mkdir();
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    /* Windows 10 supports Ansi codes. However, it's still experimental and not enabled by default.
+     * This method enables the necessary Windows 10 feature.
+     *
+     * More info: https://stackoverflow.com/a/51681675/675577
+     * Code source: https://stackoverflow.com/a/52767586/675577
+     * Reported issue: https://github.com/PowerShell/PowerShell/issues/11449#issuecomment-569531747
+     */
+    private static void enableWindows10AnsiSupport() {
+        Function GetStdHandleFunc = Function.getFunction("kernel32", "GetStdHandle");
+        DWORD STD_OUTPUT_HANDLE = new DWORD(-11);
+        HANDLE hOut = (HANDLE) GetStdHandleFunc.invoke(HANDLE.class, new Object[]{STD_OUTPUT_HANDLE});
+
+        DWORDByReference p_dwMode = new DWORDByReference(new DWORD(0));
+        Function GetConsoleModeFunc = Function.getFunction("kernel32", "GetConsoleMode");
+        GetConsoleModeFunc.invoke(BOOL.class, new Object[]{hOut, p_dwMode});
+
+        int ENABLE_VIRTUAL_TERMINAL_PROCESSING = 4;
+        DWORD dwMode = p_dwMode.getValue();
+        dwMode.setValue(dwMode.intValue() | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        Function SetConsoleModeFunc = Function.getFunction("kernel32", "SetConsoleMode");
+        SetConsoleModeFunc.invoke(BOOL.class, new Object[]{hOut, dwMode});
     }
 }
