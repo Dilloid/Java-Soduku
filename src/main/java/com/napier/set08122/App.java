@@ -30,17 +30,16 @@ public class App
       └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘
     */
 
-    private static String jarPath, savePath;
-    private static final String[] INSTRUCTIONS = new String[]{
+    private static final String[] INSTRUCTIONS = new String[] {
             "   \u001B[1;35mWelcome to Dilloid's Sudoku!\u001B[0m",
             "   ",
             "   Each space in the grid is represented by a",
             "   code consisting of one letter and one number.",
             "   For example, the square in the centre of the",
             "   grid is called \u001B[36mE5\u001B[0m. Use these codes when",
-            "   typing commands in order to choose which square",
-            "   you are interacting with. Type \u001B[32mcheck\u001B[0m to see",
-            "   if your solution is correct.",
+            "   typing commands in order to choose which box",
+            "   you are interacting with. Type \u001B[32mhelp\u001B[0m to see",
+            "   the full list of available commands.",
             "   ",
             "   Examples:",
             "   \"\u001B[32mset\u001B[0m \u001B[36mB4\u001B[0m \u001B[33m7\u001B[0m\"" +
@@ -49,8 +48,26 @@ public class App
                     " - Delete the number in square \u001B[36mF9\u001B[0m.",
     };
 
-    private static boolean completed = false;
-    private static int counter = 0, moveNo = 0;
+    private static final String[] HELPTEXT = new String[] {
+            "   \u001B[32mnew\u001B[0m \u001B[31m<easy|normal>\u001B[0m - Start a new game with the selected difficulty.",
+            "   \u001B[32msave\u001B[0m \u001B[31m<filename>\u001B[0m - Save the current game with your chosen filename.",
+            "   \u001B[32mload\u001B[0m \u001B[31m<filename>\u001B[0m - Load the game saved under the provided filename.",
+            "   ",
+            "   \u001B[32mset\u001B[0m \u001B[36m<box>\u001B[0m \u001B[33m<value>\u001B[0m - Fill box <box> with the number <value>.",
+            "   \u001B[32mclear\u001B[0m \u001B[36m<box>\u001B[0m - Delete the number in box <box>.",
+            "   \u001B[32mundo\u001B[0m - Undo the last move.",
+            "   \u001B[32mredo\u001B[0m - Redo the move you last undid.",
+            "   \u001B[32mcheck\u001B[0m - Check if your solution is correct.",
+            "   ",
+            "   \u001B[32mhelp\u001B[0m - Show this information.",
+            "   \u001B[32mins\u001B[0m - Show the instructions again.",
+            "   \u001B[32mexit\u001B[0m - Exit the game."
+    };
+
+    private static String[] display = INSTRUCTIONS;
+    private static String jarPath, savePath, msg = "";
+    private static boolean completed;
+    private static int counter, moveNo;
     private static int[][] grid, gridCopy, original;
     private static List<int[]> hints, moves;
 
@@ -59,159 +76,234 @@ public class App
         enableWindows10AnsiSupport();
         createSaveDir();
 
-        newGame(12);
+        newGame(16);
         printGrid();
 
         Scanner scanner = new Scanner(System.in);
 
         while (true)
         {
-            System.out.print("\n More Commands:" +
-                             "\n \u001B[32mundo\u001B[0m - Undo the last move." +
-                             "\n \u001B[32mredo\u001B[0m - Redo the move you last undid." +
-                             "\n \u001B[32mexit\u001B[0m - Exit the game.\n");
-
-            System.out.print("\n Please input a command:\n\u001B[32m> ");
+            System.out.print(msg);
+            msg = "";
+            System.out.print("\n Please input a command:\n \u001B[32m> ");
             String[] input = scanner.nextLine().split(" ");
 
-            if (input[0].equalsIgnoreCase("check"))
+            if (input.length > 0)
             {
-                if (testPuzzle(grid))
+                if (input[0].equalsIgnoreCase("check"))
                 {
-                    System.out.print("\n Congratulations, you win!\n");
-                    break;
-                }
-            }
-            else if (input[0].equalsIgnoreCase("set"))
-            {
-                int col = charToInt(input[1].charAt(0));
-                int row = Integer.parseInt(String.valueOf(input[1].charAt(1))) - 1;
-
-                if (col != -1 && row >= 0 && row <= 8 && !isHint(row, col))
-                {
-                    if (input[2] != null && input[2].matches("^[0-9]+$"))
+                    if (testPuzzle(grid))
                     {
-                        int newValue = Integer.parseInt(input[2]);
-
-                        if (newValue >= 1 && newValue <= 9) {
-                            if (moves.size() > moveNo) {
-                                for (int i = moves.size() - 1; i >= moveNo; i--)
-                                    moves.remove(i);
-                            }
-
-                            int lastValue = grid[row][col];
-                            grid[row][col] = newValue;
-                            moves.add(new int[]{row, col, newValue, lastValue});
-                            moveNo++;
-                        }
+                        completed = true;
+                        msg = "\n \u001B[35mCongratulations, you win!" +
+                                "\n Use \u001B[32msave \u001B[31m<filename> \u001B[35mto save this game," +
+                                "\n or use \u001B[32mnew \u001B[31m<easy|medium> \u001B[35mto start a new game.\u001B[0m\n";
+                    }
+                    else
+                    {
+                        msg = "\n \u001B[31mSorry, this solution is incorrect :(\u001B[0m\n";
                     }
                 }
-            }
-            else if (input[0].equalsIgnoreCase("clear"))
-            {
-                int col = charToInt(input[1].charAt(0));
-                int row = Integer.parseInt(String.valueOf(input[1].charAt(1))) - 1;
+                else if (input[0].equalsIgnoreCase("set"))
+                {
+                    if (input.length > 1)
+                    {
+                        if (input[1].length() == 2)
+                        {
+                            int col = charToInt(input[1].charAt(0));
+                            int row = Integer.parseInt(String.valueOf(input[1].charAt(1))) - 1;
 
-                if (col != -1 && row >= 0 && row <= 8 && !isHint(row, col))
+                            if (col != -1 && row >= 0 && row <= 8 && !isHint(row, col))
+                            {
+                                if (input.length > 2)
+                                {
+                                    if (input[2].matches("^[0-9]+$"))
+                                    {
+                                        int newValue = Integer.parseInt(input[2]);
+
+                                        if (newValue >= 1 && newValue <= 9)
+                                        {
+                                            if (moves.size() > moveNo)
+                                            {
+                                                for (int i = moves.size() - 1; i >= moveNo; i--)
+                                                    moves.remove(i);
+                                            }
+
+                                            int lastValue = grid[row][col];
+                                            grid[row][col] = newValue;
+                                            moves.add(new int[]{row, col, newValue, lastValue});
+                                            moveNo++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            msg = "\n \u001B[31mInvalid box code!\u001B[0m\n";
+                        }
+                    }
+                    else
+                    {
+                        msg = "\n \u001B[31mNot enough arguments!\u001B[0m\n";
+                    }
+                }
+                else if (input[0].equalsIgnoreCase("clear"))
+                {
+                    if (input.length > 1)
+                    {
+                        if (input[1].length() == 2)
+                        {
+                            int col = charToInt(input[1].charAt(0));
+                            int row = Integer.parseInt(String.valueOf(input[1].charAt(1))) - 1;
+
+                            if (col != -1 && row >= 0 && row <= 8 && !isHint(row, col))
+                            {
+                                if (moves.size() > moveNo)
+                                {
+                                    for (int i = moves.size() - 1; i >= moveNo; i--)
+                                        moves.remove(i);
+                                }
+
+                                int lastValue = grid[row][col];
+                                grid[row][col] = 0;
+                                moves.add(new int[]{row, col, 0, lastValue});
+                                moveNo++;
+                            }
+                        }
+                        else
+                        {
+                            msg = "\n \u001B[31mInvalid box code!\u001B[0m\n";
+                        }
+                    }
+                    else
+                    {
+                        msg = "\n \u001B[31mNot enough arguments!\u001B[0m\n";
+                    }
+                }
+                else if (input[0].equalsIgnoreCase("undo"))
+                {
+                    if (moveNo > 0)
+                    {
+                        int[] lastMove = moves.get(moveNo - 1);
+                        int row = lastMove[0];
+                        int col = lastMove[1];
+                        grid[row][col] = lastMove[3];
+                        moveNo--;
+                    }
+                }
+                else if (input[0].equalsIgnoreCase("redo"))
                 {
                     if (moves.size() > moveNo)
                     {
-                        for (int i = moves.size()-1; i >= moveNo; i--)
-                            moves.remove(i);
+                        int[] redoMove = moves.get(moveNo);
+                        int row = redoMove[0];
+                        int col = redoMove[1];
+                        grid[row][col] = redoMove[2];
+                        moveNo++;
                     }
-
-                    int lastValue = grid[row][col];
-                    grid[row][col] = 0;
-                    moves.add(new int[]{row, col, 0, lastValue});
-                    moveNo++;
                 }
-            }
-            else if (input[0].equalsIgnoreCase("undo"))
-            {
-                if (moveNo > 0)
+                else if (input[0].equalsIgnoreCase("new"))
                 {
-                    int[] lastMove = moves.get(moveNo - 1);
-                    int row = lastMove[0];
-                    int col = lastMove[1];
-                    grid[row][col] = lastMove[3];
-                    moveNo--;
+                    if (input.length > 1)
+                    {
+                        int rounds = 0;
+
+                        if (input[1].equalsIgnoreCase("easy"))
+                            rounds = 1;
+                        else if (input[1].equalsIgnoreCase("normal"))
+                            rounds = 16;
+                        else
+                            msg = "\n \u001B[31mInvalid difficulty! Choose easy or normal.\u001B[0m\n";
+
+                        if (rounds > 0)
+                            newGame(rounds);
+                    }
+                    else
+                    {
+                        msg = "\n \u001B[31mNot enough arguments!\u001B[0m\n";
+                    }
                 }
-            }
-            else if (input[0].equalsIgnoreCase("redo"))
-            {
-                if (moves.size() > moveNo)
+                else if (input[0].equalsIgnoreCase("save"))
                 {
-                    int[] redoMove = moves.get(moveNo);
-                    int row = redoMove[0];
-                    int col = redoMove[1];
-                    grid[row][col] = redoMove[2];
-                    moveNo++;
-                }
-            }
-            else if (input[0].equalsIgnoreCase("save"))
-            {
-                createSaveDir();
+                    createSaveDir();
 
-                if (input[1] != null)
+                    if (input.length > 1)
+                    {
+                        try
+                        {
+                            GameData save = new GameData(grid, gridCopy, original, counter,
+                                                         moveNo, completed, hints, moves);
+
+                            String filePath = savePath + input[1] + ".ser";
+                            File saveFile = new File(filePath);
+                            saveFile.createNewFile();
+
+                            FileOutputStream fileOut = new FileOutputStream(saveFile, false);
+                            ObjectOutputStream out = new ObjectOutputStream(fileOut);
+                            out.writeObject(save);
+                            out.close();
+                            fileOut.close();
+                        }
+                        catch (Exception e)
+                        {
+                            msg = "\n \u001B[31mInvalid filename!\u001B[0m\n";
+                        }
+                    }
+                    else
+                    {
+                        msg = "\n \u001B[31mNot enough arguments!\u001B[0m\n";
+                    }
+                }
+                else if (input[0].equalsIgnoreCase("load"))
                 {
-                    try
+                    createSaveDir();
+
+                    if (input.length > 1)
                     {
-                        GameData save = new GameData(grid, gridCopy, original, counter,
-                                                     moveNo, completed, hints, moves);
+                        try
+                        {
+                            GameData load = null;
 
-                        String filePath = savePath + input[1] + ".ser";
+                            String filePath = savePath + input[1] + ".ser";
+                            FileInputStream fileIn = new FileInputStream(filePath);
+                            ObjectInputStream in = new ObjectInputStream(fileIn);
+                            load = (GameData) in.readObject();
+                            in.close();
+                            fileIn.close();
 
-                        File saveFile = new File(filePath);
-                        saveFile.createNewFile();
-
-                        FileOutputStream fileOut = new FileOutputStream(saveFile, false);
-                        ObjectOutputStream out = new ObjectOutputStream(fileOut);
-                        out.writeObject(save);
-                        out.close();
-                        fileOut.close();
+                            grid = load.getGrid();
+                            gridCopy = load.getGridCopy();
+                            original = load.getOriginal();
+                            counter = load.getCounter();
+                            moveNo = load.getMoveNo();
+                            completed = load.getCompleted();
+                            hints = load.getHints();
+                            moves = load.getMoves();
+                        }
+                        catch (Exception e)
+                        {
+                            msg = "\n \u001B[31mInvalid filename!\u001B[0m\n";
+                        }
                     }
-                    catch (Exception e)
+                    else
                     {
-                        e.printStackTrace();
+                        msg = "\n \u001B[31mNot enough arguments!\u001B[0m\n";
                     }
                 }
-            }
-            else if (input[0].equalsIgnoreCase("load"))
-            {
-                createSaveDir();
-
-                if (input[1] != null)
+                else if (input[0].equalsIgnoreCase("help"))
                 {
-                    try
-                    {
-                        GameData load = null;
-
-                        String filePath = savePath + input[1] + ".ser";
-                        FileInputStream fileIn = new FileInputStream(filePath);
-                        ObjectInputStream in = new ObjectInputStream(fileIn);
-                        load = (GameData) in.readObject();
-                        in.close();
-                        fileIn.close();
-
-                        grid = load.getGrid();
-                        gridCopy = load.getGridCopy();
-                        original = load.getOriginal();
-                        counter = load.getCounter();
-                        moveNo = load.getMoveNo();
-                        completed = load.getCompleted();
-                        hints = load.getHints();
-                        moves = load.getMoves();
-                    }
-                    catch (Exception e)
-                    {
-                        e.printStackTrace();
-                    }
+                    display = HELPTEXT;
                 }
-            }
-            else if (input[0].equalsIgnoreCase("exit"))
-            {
-                System.out.println("\n \u001B[35mThank you for playing!\u001B[0m");
-                System.exit(0);
+                else if (input[0].equalsIgnoreCase("ins"))
+                {
+                    display = INSTRUCTIONS;
+                }
+                else if (input[0].equalsIgnoreCase("exit"))
+                {
+                    System.out.println("\n \u001B[35mThank you for playing!\u001B[0m");
+                    System.exit(0);
+                }
             }
 
             printGrid();
@@ -224,7 +316,6 @@ public class App
 
         System.out.print("\n \u001B[36m    A   B   C     D   E   F     G   H   I\u001B[0m");
         System.out.print("\n   ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐");
-
 
         int ins = 0;
         for (int row = 0; row < 9; row++)
@@ -246,13 +337,13 @@ public class App
                 }
             }
 
-            System.out.print(" |" + INSTRUCTIONS[ins++]);
+            System.out.print(" |" + display[ins++]);
 
             if (row == 2 || row == 5)
             {
                 System.out.print("\n");
-                System.out.println("   └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘" + INSTRUCTIONS[ins++]);
-                System.out.print("   ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐" + INSTRUCTIONS[ins++]);
+                System.out.println("   └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘" + display[ins++]);
+                System.out.print("   ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐" + display[ins++]);
             }
         }
 
@@ -281,6 +372,13 @@ public class App
     private static void newGame(int difficulty)
     {
         grid = new int[9][9];
+        gridCopy = new int[9][9];
+        original = new int[9][9];
+        counter = 0;
+        moveNo = 0;
+        completed = false;
+        hints = new ArrayList<>();
+        moves = new ArrayList<>();
 
         for (int row = 0; row < 9; row++)
             for (int col = 0; col < 9; col++)

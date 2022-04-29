@@ -22,7 +22,6 @@ public class GameData implements java.io.Serializable
                     int counter, int moveNo, boolean completed,
                     List<int[]> hints, List<int[]> moves)
     {
-
         this.grid = grid;
         this.gridCopy = gridCopy;
         this.original = original;
